@@ -44,6 +44,10 @@
 #                         channel option
 #   -n, --dryrun          No Change is actually made, only print what would be
 #                         done
+#   -k KEEP, --keep=CHANNEL
+#                         Keep this package if found in an other CHANNEL
+#                         Multiple definitions possible
+
 
 #
 #
@@ -85,6 +89,8 @@ def parse_args():
             help="Limit number of packages removed to MAX. Default: no limit.")
     parser.add_option("-n", "--dryrun", action="store_true", dest="dryrun",
             help="No Change is actually made, only print what would be done")
+    parser.add_option("-k", "--keep", type="string", dest="kp_channels", default=[], action="append",
+            help="Keep package if found in this other channel. This option can be define multiple time.")
     (options,args) = parser.parse_args()
     return options
 
@@ -132,10 +138,18 @@ def main():
         newpkgs = spacewalk.channel.software.listLatestPackages(spacekey, options.channel)
         print " - Amount: %d" % len(newpkgs)
         for pkg in allpkgs:
-            if not cmp_dictarray(newpkgs, pkg['id']):
-                print "Marked:  %s-%s-%s (id %s)" % (pkg['name'], pkg['version'], pkg['release'], pkg['id'])
-                to_delete.append(pkg)
-                to_delete_ids.append(pkg['id'])
+            pkgchannels = spacewalk.packages.listProvidingChannels(spacekey, pkg['id'])
+            kppkg = 0
+            for pkgchannel in pkgchannels:
+                if pkgchannel['label'] in options.kp_channels:
+                    kppkg = 1
+            if kppkg == 0:
+                if not cmp_dictarray(newpkgs, pkg['id']):
+                    print "Marked:  %s-%s-%s (id %s)" % (pkg['name'], pkg['version'], pkg['release'], pkg['id'])
+                    to_delete.append(pkg)
+                    to_delete_ids.append(pkg['id'])
+            else:
+                print "Keep:  %s-%s-%s (id %s)" % (pkg['name'], pkg['version'], pkg['release'], pkg['id'])
         print "Removing packages from channel..."
 
     if options.wo_channel is not None:
@@ -181,3 +195,4 @@ def main():
 ## MAIN
 if __name__ == "__main__":
     main() 
+
